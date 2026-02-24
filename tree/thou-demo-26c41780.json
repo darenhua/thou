@@ -1,0 +1,16 @@
+{
+  "id": "thou-demo-26c41780",
+  "childIds": [],
+  "sourceNodeId": null,
+  "prompt": "# Generate\n\nCreate a new prototype application from scratch.\n\n## Your Task\n\nmake a demo page that uses Better Auth with one-time password login flow. use web research to make sure you understand how better auth integration works and make sure you bun install it. Simple page where you enter email, get a code, enter code, you're logged in. Prove it works standalone. use the simplest way.\n\n## Directories\n\n- **Your output directory** (READ + WRITE): `/Users/lellyo/Desktop/cool-projects/ralph-kit-test/THOU-DEMO/prototypes/thou-demo-26c41780`\n- **All prototypes** (READ-only): `/Users/lellyo/Desktop/cool-projects/ralph-kit-test/THOU-DEMO/prototypes`\n\n## Instructions\n\n1. Create the application in your output directory\n2. Use a simple, working tech stack (e.g. a single-page app with HTML/CSS/JS, or a small React/Vite app)\n3. Include a `package.json` with a `dev` script so the dashboard can serve it\n4. Make it functional and visually clean\n5. Use absolute paths for all file operations\n",
+  "bead": null,
+  "result": null,
+  "timestamps": {
+    "created_at": "2026-02-24T23:46:49.620Z",
+    "updated_at": "2026-02-24T23:46:49.620Z",
+    "completed_at": null,
+    "approved_at": null
+  },
+  "question": "make a demo page that uses Better Auth with one-time password login flow. use web research to make sure you understand how better auth integration works and make sure you bun install it. Simple page where you enter email, get a code, enter code, you're logged in. Prove it works standalone. use the simplest way.",
+  "nodeType": "generate"
+}

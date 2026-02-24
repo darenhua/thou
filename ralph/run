@@ -1,0 +1,191 @@
+#!/bin/bash
+
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+RETRY_DELAY=5
+
+echo "Starting Ralph prototype loop (runs forever)"
+echo ""
+
+i=0
+while true; do
+    i=$((i + 1))
+
+    # Get next ready bead as JSON
+    BEAD_JSON=$(bd ready --json -n 1 2>/dev/null || echo "[]")
+    BEAD_ID=$(echo "$BEAD_JSON" | jq -r '.[0].id // empty')
+
+    if [[ -z "$BEAD_ID" ]]; then
+        echo "No ready beads. Retrying in ${RETRY_DELAY}s..."
+        sleep "$RETRY_DELAY"
+        continue
+    fi
+
+    # Get full bead details
+    BEAD_DETAIL=$(bd show "$BEAD_ID" --json 2>/dev/null || echo "[]")
+    BEAD_TITLE=$(echo "$BEAD_DETAIL" | jq -r '.[0].title // empty')
+    BEAD_DESC=$(echo "$BEAD_DETAIL" | jq -r '.[0].description // empty')
+
+    APP_DIR="$ROOT_DIR/prototypes/$BEAD_ID"
+
+    echo "=========================================="
+    echo "Ralph iteration $i"
+    echo "Bead: $BEAD_ID - $BEAD_TITLE"
+    echo "=========================================="
+
+    # Run the full bead processing in a subshell so errors don't kill the loop
+    (
+        set -e
+
+        # Claim the bead
+        bd update "$BEAD_ID" --status in_progress
+
+        # Resolve prototype type from bead labels (default: nextjs)
+        PROTO_TYPE=$(echo "$BEAD_DETAIL" | jq -r '
+            [.[0].labels[]? | select(startswith("proto-"))] | first // empty
+        ' | sed 's/^proto-//')
+        PROTO_TYPE="${PROTO_TYPE:-nextjs}"
+
+        # Scaffold prototype via setup.sh
+        "$ROOT_DIR/ralph/setup.sh" "$APP_DIR" "$ROOT_DIR" "$PROTO_TYPE"
+
+        # Build the prompt with the spec embedded
+        PROMPT=$(cat <<EOF
+You are implementing prototype "$BEAD_ID" in the directory "$APP_DIR".
+
+## Spec: $BEAD_TITLE
+
+$BEAD_DESC
+
+## Instructions
+1. Read $APP_DIR/CLAUDE.md for project conventions
+2. Read $ROOT_DIR/ralph/PROTOTYPE.md for implementation guidelines
+3. Implement the FULL spec above as a working Next.js application
+4. Install any dependencies you need with \`bun add <pkg>\` (run from $APP_DIR)
+5. Create appropriate pages in src/app/, components in src/components/, etc.
+6. Write tests for key functionality
+7. Run $APP_DIR/check to verify quality gates pass
+8. When done, simply stop — do not commit or push
+EOF
+        )
+
+        # Invoke Claude agent scoped to the prototype, capturing raw stream for result extraction
+        STREAM_LOG=$(mktemp)
+        claude -p "$PROMPT" \
+            --dangerously-skip-permissions \
+            --output-format stream-json \
+            --verbose \
+            --include-partial-messages \
+            | tee "$STREAM_LOG" \
+            | node "$ROOT_DIR/.devcontainer/parse-claude-stream.js"
+
+        # Extract the result line and write to markdown
+        RESULT_LINE=$(grep '{"type":"result"' "$STREAM_LOG" | tail -1 || true)
+        rm -f "$STREAM_LOG"
+
+        if [[ -n "$RESULT_LINE" ]]; then
+            COST=$(echo "$RESULT_LINE" | jq -r '.cost_usd // "unknown"')
+            TURNS=$(echo "$RESULT_LINE" | jq -r '.num_turns // "unknown"')
+            DURATION=$(echo "$RESULT_LINE" | jq -r '.duration_ms // "unknown"')
+            SESSION=$(echo "$RESULT_LINE" | jq -r '.session_id // "unknown"')
+            SUBTYPE=$(echo "$RESULT_LINE" | jq -r '.subtype // "unknown"')
+
+            cat > "$APP_DIR/RESULT.md" << RESULTMD
+# Prototype Result: $BEAD_TITLE
+
+| Field | Value |
+|-------|-------|
+| **Bead ID** | $BEAD_ID |
+| **Status** | $SUBTYPE |
+| **Cost** | \$$COST |
+| **Turns** | $TURNS |
+| **Duration (ms)** | $DURATION |
+| **Session ID** | $SESSION |
+
+## Raw Result
+\`\`\`json
+$RESULT_LINE
+\`\`\`
+RESULTMD
+            echo "Result saved to $APP_DIR/RESULT.md (cost: \$$COST, turns: $TURNS)"
+        fi
+
+        # Close the bead
+        bd close "$BEAD_ID" --reason "Prototype implemented in prototypes/$BEAD_ID"
+
+        # Write tree file for this prototype
+        TREE_DIR="$ROOT_DIR/tree"
+        mkdir -p "$TREE_DIR"
+
+        CHILD_IDS=$(echo "$BEAD_DETAIL" | jq -c '[.[0].dependencies[]?.depends_on_id | select(. != null)] // []')
+        if echo "$BEAD_DETAIL" | jq -e '.[0].labels[]? | select(. == "join")' >/dev/null 2>&1; then
+            NODE_TYPE="join"
+        else
+            NODE_TYPE="generate"
+        fi
+        NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+        BEAD_LABELS=$(echo "$BEAD_DETAIL" | jq -c '[.[0].labels[]? | select(. != null)] // []')
+        BEAD_STATUS=$(echo "$BEAD_DETAIL" | jq -r '.[0].status // "closed"')
+
+        # Build result object from RESULT.md data
+        if [[ -n "$RESULT_LINE" ]]; then
+            RESULT_OBJ=$(echo "$RESULT_LINE" | jq -c '{
+                status: (.subtype // "unknown"),
+                cost_usd: (.total_cost_usd // null),
+                turns: (.num_turns // null),
+                duration_ms: (.duration_ms // null),
+                session_id: (.session_id // null)
+            }')
+        else
+            RESULT_OBJ="null"
+        fi
+
+        # Write tree file
+        jq -n \
+            --arg id "$BEAD_ID" \
+            --arg question "$BEAD_TITLE" \
+            --arg prompt "$BEAD_DESC" \
+            --arg nodeType "$NODE_TYPE" \
+            --argjson childIds "$CHILD_IDS" \
+            --arg now "$NOW" \
+            --arg beadTitle "$BEAD_TITLE" \
+            --arg beadStatus "$BEAD_STATUS" \
+            --argjson beadLabels "$BEAD_LABELS" \
+            --argjson result "$RESULT_OBJ" \
+            '{
+                id: $id,
+                question: $question,
+                prompt: $prompt,
+                nodeType: $nodeType,
+                childIds: $childIds,
+                sourceNodeId: null,
+                timestamps: {
+                    created_at: $now,
+                    updated_at: $now,
+                    completed_at: $now,
+                    approved_at: null
+                },
+                bead: {
+                    id: $id,
+                    title: $beadTitle,
+                    status: $beadStatus,
+                    labels: $beadLabels
+                },
+                result: $result
+            }' > "$TREE_DIR/${BEAD_ID}.json"
+        echo "Wrote tree/${BEAD_ID}.json (type: $NODE_TYPE, children: $CHILD_IDS)"
+
+        # Log progress
+        echo "[$i] $BEAD_ID: $BEAD_TITLE - DONE" >> "$ROOT_DIR/ralph/progress.txt"
+
+        # Commit this prototype
+        git add "prototypes/$BEAD_ID" ralph/progress.txt "tree/${BEAD_ID}.json"
+        git commit -m "prototype($BEAD_ID): $BEAD_TITLE"
+    )
+
+    if [[ $? -ne 0 ]]; then
+        echo "ERROR processing bead $BEAD_ID. Retrying in ${RETRY_DELAY}s..."
+        sleep "$RETRY_DELAY"
+    fi
+
+done

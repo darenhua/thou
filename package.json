@@ -1,0 +1,19 @@
+{
+  "name": "thou-demo",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "thou-demo": "./index.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.52",
+    "commander": "^14.0.3"
+  }
+}
