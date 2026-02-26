@@ -37,3 +37,6 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 prototypes/*/node_modules
 prototypes/*/.next
 dashboard/node_modules
+
+prototypes/*
+tree/*

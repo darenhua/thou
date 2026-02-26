@@ -1,5 +1,0 @@
-#!/bin/bash
-set -e
-cd "$(dirname "$0")"
-bunx biome check --write .
-bun test --dots

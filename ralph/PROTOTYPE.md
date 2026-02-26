@@ -26,9 +26,8 @@ src/
 ## Quality Requirements
 
 1. All code must pass `./check` (biome lint + tests)
-2. Write tests for core logic and key user flows
-3. Use TypeScript strict mode
-4. Use Tailwind CSS — no inline styles or CSS modules unless necessary
+2. Use TypeScript strict mode
+3. Use Tailwind CSS — no inline styles or CSS modules unless necessary
 
 ## What NOT to Do
 
@@ -36,3 +35,4 @@ src/
 - Do NOT interact with bd/beads
 - Do NOT modify files outside your prototype directory
 - Do NOT create additional configuration at the project root
+- Do NOT write tests for now, just focus on making it work.

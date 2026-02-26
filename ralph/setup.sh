@@ -68,7 +68,6 @@ cat > "$APP_DIR/check" << 'CHECK'
 set -e
 cd "$(dirname "$0")"
 bunx biome check --write .
-bun test --dots
 CHECK
 chmod +x "$APP_DIR/check"
 
@@ -84,19 +83,17 @@ This is an independent Next.js prototype. Use **bun** as your package manager.
 bun install           # Install dependencies
 bun run dev           # Start dev server
 bun run build         # Build the project
-bun test              # Run tests
-./check               # Run quality gates (biome + tests)
+./check               # Run quality gates (biome)
 ```
 
 ## Rules
 
 - Work ONLY within this directory
 - Do NOT run git commands (the outer loop handles commits)
-- Do NOT interact with bd/beads (the outer loop handles issue tracking)
 - Install any additional dependencies you need with `bun add <pkg>`
-- Implement the full spec: pages, components, API routes, and tests
-- Run `./check` before declaring work complete
+- Implement the full spec: pages, components, API routes
 - Use the App Router (src/app/) for all routes
+- Dont write tests for now.
 CLAUDEMD
         ;;
 
@@ -108,18 +105,15 @@ This is a bare prototype directory. Use **bun** as your package manager.
 
 ```bash
 bun install           # Install dependencies
-bun test              # Run tests
-./check               # Run quality gates (biome + tests)
+./check               # Run quality gates (biome)
 ```
 
 ## Rules
 
 - Work ONLY within this directory
 - Do NOT run git commands (the outer loop handles commits)
-- Do NOT interact with bd/beads (the outer loop handles issue tracking)
 - Install any dependencies you need with `bun add <pkg>`
 - Set up the project structure from scratch as needed
-- Write tests for key functionality
 - Run `./check` before declaring work complete
 CLAUDEMD
         ;;
@@ -132,18 +126,15 @@ This is a plain Node.js prototype. Use **bun** as your package manager.
 
 ```bash
 bun install           # Install dependencies
-bun test              # Run tests
-./check               # Run quality gates (biome + tests)
+./check               # Run quality gates (biome)
 ```
 
 ## Rules
 
 - Work ONLY within this directory
 - Do NOT run git commands (the outer loop handles commits)
-- Do NOT interact with bd/beads (the outer loop handles issue tracking)
 - Install any dependencies you need with `bun add <pkg>`
 - Implement the full spec
-- Write tests for key functionality
 - Run `./check` before declaring work complete
 CLAUDEMD
         ;;
