@@ -3,10 +3,9 @@ import { join, resolve } from 'node:path'
 import { Command } from 'commander'
 import type { TreeFile } from '../../dashboard/src/lib/types'
 import { runScopedSession } from '../lib/scoped-session'
+import { PROTOTYPES_DIR, TREE_DIR } from '../paths'
 import { ROOT } from '../root'
 
-const PROTOTYPES_DIR = resolve(ROOT, 'prototypes')
-const TREE_DIR = resolve(ROOT, 'tree')
 const TEMPLATES_DIR = resolve(ROOT, 'templates')
 const ROOT_DIR = ROOT
 
@@ -100,8 +99,8 @@ export const askCommand = new Command('ask')
           console.log(
             `  Time:  ${((event.data.duration_ms as number) / 1000).toFixed(1)}s`
           )
-          console.log(`  Output:    prototypes/${id}/`)
-          console.log(`  Tree file: tree/${id}.json`)
+          console.log(`  Output:    ~/.thou/prototypes/${id}/`)
+          console.log(`  Tree file: ~/.thou/tree/${id}.json`)
           break
         }
         case 'error':

@@ -12,8 +12,15 @@ import { join, resolve } from "node:path";
 import type { ServerWebSocket } from "bun";
 import { deleteNode, loadGraph, saveNode } from "./src/lib/graph-store";
 import { applyOperation, type OperationPayload } from "./src/lib/operations";
+import {
+    deleteProject,
+    loadProjects,
+    pickColor,
+    saveProject,
+    slugify,
+} from "./src/lib/project-store";
 import { getPrototypeDirs } from "./src/lib/prototypes";
-import type { NodeType, PrototypeNode } from "./src/lib/types";
+import type { NodeType, ProjectMeta, PrototypeNode } from "./src/lib/types";
 import {
     addSubscriber,
     readSessionLog,
@@ -22,10 +29,10 @@ import {
 } from "./session-manager";
 
 
+import { PROTOTYPES_DIR, TREE_DIR, PROJECTS_DIR } from "../src/paths";
+
 const DASHBOARD_DIR = import.meta.dir;
 const ROOT = resolve(DASHBOARD_DIR, "..");
-const TREE_DIR = resolve(ROOT, "tree");
-const PROTOTYPES_DIR = resolve(ROOT, "prototypes");
 const TEMPLATES_DIR = resolve(ROOT, "templates");
 const FIRST_PORT = 4001;
 const API_PORT = 3101;
@@ -152,6 +159,94 @@ Bun.serve<WsData>({
             return undefined;
         }
 
+        // GET /api/projects — list all projects
+        if (url.pathname === "/api/projects" && req.method === "GET") {
+            const projects = await loadProjects(PROJECTS_DIR);
+            return Response.json(projects);
+        }
+
+        // POST /api/projects — create a new project
+        if (url.pathname === "/api/projects" && req.method === "POST") {
+            const { name, description } = (await req.json()) as {
+                name: string;
+                description?: string;
+            };
+            const existing = await loadProjects(PROJECTS_DIR);
+            let slug = slugify(name);
+            // Ensure unique slug
+            if (existing[slug]) {
+                let i = 2;
+                while (existing[`${slug}-${i}`]) i++;
+                slug = `${slug}-${i}`;
+            }
+            const project: ProjectMeta = {
+                slug,
+                name,
+                color: pickColor(existing),
+                description: description ?? "",
+                createdAt: new Date().toISOString(),
+            };
+            await saveProject(PROJECTS_DIR, project);
+            return Response.json(project);
+        }
+
+        // POST /api/projects/save-current — create project + assign all unsaved nodes
+        if (
+            url.pathname === "/api/projects/save-current" &&
+            req.method === "POST"
+        ) {
+            const { name, description } = (await req.json()) as {
+                name: string;
+                description?: string;
+            };
+            const existing = await loadProjects(PROJECTS_DIR);
+            let slug = slugify(name);
+            if (existing[slug]) {
+                let i = 2;
+                while (existing[`${slug}-${i}`]) i++;
+                slug = `${slug}-${i}`;
+            }
+            const project: ProjectMeta = {
+                slug,
+                name,
+                color: pickColor(existing),
+                description: description ?? "",
+                createdAt: new Date().toISOString(),
+            };
+            await saveProject(PROJECTS_DIR, project);
+
+            // Assign all unsaved nodes to this project
+            const graph = await loadGraph(TREE_DIR);
+            for (const node of Object.values(graph)) {
+                if (node.project === null) {
+                    node.project = slug;
+                    await saveNode(TREE_DIR, node);
+                }
+            }
+
+            return Response.json({ project, assignedCount: Object.values(graph).filter(n => n.project === slug).length });
+        }
+
+        // DELETE /api/projects/:slug
+        const projectDeleteMatch = url.pathname.match(
+            /^\/api\/projects\/([^/]+)$/,
+        );
+        if (projectDeleteMatch && req.method === "DELETE") {
+            const slug = projectDeleteMatch[1];
+
+            // Revert member nodes to unsaved
+            const graph = await loadGraph(TREE_DIR);
+            for (const node of Object.values(graph)) {
+                if (node.project === slug) {
+                    node.project = null;
+                    await saveNode(TREE_DIR, node);
+                }
+            }
+
+            await deleteProject(PROJECTS_DIR, slug);
+            return Response.json({ ok: true });
+        }
+
         // GET /api/graph — load graph, auto-populate from proto dirs
         if (url.pathname === "/api/graph" && req.method === "GET") {
             const graph = await loadGraph(TREE_DIR);
@@ -168,6 +263,7 @@ Bun.serve<WsData>({
                         childIds: [],
                         parentIds: [],
                         sourceNodeId: null,
+                        project: null,
                         timestamps: {
                             created_at: ts,
                             updated_at: ts,
@@ -180,6 +276,20 @@ Bun.serve<WsData>({
                     graph[dir] = node;
                     await saveNode(TREE_DIR, node);
                 }
+            }
+
+            // Filter by project if specified
+            const projectFilter = url.searchParams.get("project");
+            if (projectFilter) {
+                const filtered: Record<string, PrototypeNode> = {};
+                for (const [id, node] of Object.entries(graph)) {
+                    if (projectFilter === "__unsaved__") {
+                        if (node.project === null) filtered[id] = node;
+                    } else {
+                        if (node.project === projectFilter) filtered[id] = node;
+                    }
+                }
+                return Response.json(filtered);
             }
 
             return Response.json(graph);

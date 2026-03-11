@@ -25,7 +25,7 @@ export async function loadGraph(
   // Build nodes with empty parentIds
   const graph: Record<string, PrototypeNode> = {}
   for (const tf of treeFiles) {
-    graph[tf.id] = { ...tf, parentIds: [] }
+    graph[tf.id] = { ...tf, project: tf.project ?? null, parentIds: [] }
   }
 
   // Compute parentIds by inverting childIds

@@ -25,7 +25,7 @@ while true; do
     BEAD_TITLE=$(echo "$BEAD_DETAIL" | jq -r '.[0].title // empty')
     BEAD_DESC=$(echo "$BEAD_DETAIL" | jq -r '.[0].description // empty')
 
-    APP_DIR="$ROOT_DIR/prototypes/$BEAD_ID"
+    APP_DIR="$HOME/.thou/prototypes/$BEAD_ID"
 
     echo "=========================================="
     echo "Ralph iteration $i"
@@ -113,7 +113,8 @@ RESULTMD
         bd close "$BEAD_ID" --reason "Prototype implemented in prototypes/$BEAD_ID"
 
         # Write tree file for this prototype
-        TREE_DIR="$ROOT_DIR/tree"
+        TREE_DIR="$HOME/.thou/tree"
+        mkdir -p "$HOME/.thou/prototypes"
         mkdir -p "$TREE_DIR"
 
         CHILD_IDS=$(echo "$BEAD_DETAIL" | jq -c '[.[0].dependencies[]?.depends_on_id | select(. != null)] // []')
@@ -179,7 +180,7 @@ RESULTMD
         echo "[$i] $BEAD_ID: $BEAD_TITLE - DONE" >> "$ROOT_DIR/ralph/progress.txt"
 
         # Commit this prototype
-        git add "prototypes/$BEAD_ID" ralph/progress.txt "tree/${BEAD_ID}.json"
+        git add ralph/progress.txt
         git commit -m "prototype($BEAD_ID): $BEAD_TITLE"
     )
 

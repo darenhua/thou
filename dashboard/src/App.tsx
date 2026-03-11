@@ -19,13 +19,15 @@ import ApprovalQueue from '@/components/ApprovalQueue'
 import OperationModal from '@/components/OperationModal'
 import type { OperationType } from '@/components/OperationToolbar'
 import OperationToolbar from '@/components/OperationToolbar'
+import ProjectSwitcher from '@/components/ProjectSwitcher'
 import PrototypeNode from '@/components/PrototypeNode'
+import SaveProjectModal from '@/components/SaveProjectModal'
 import SessionLog from '@/components/SessionLog'
 import {
   layoutGraph,
   type PrototypeNodeData,
 } from '@/lib/graph-layout'
-import type { PrototypeNode as PrototypeNodeType } from '@/lib/types'
+import type { ProjectMeta, PrototypeNode as PrototypeNodeType } from '@/lib/types'
 
 const nodeTypes = { prototypeNode: PrototypeNode }
 
@@ -61,22 +63,52 @@ function GraphEditor() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [modalType, setModalType] = useState<OperationType | null>(null)
   const [loading, setLoading] = useState(true)
+  const [currentProject, setCurrentProject] = useState<string | '__unsaved__' | null>(null)
+  const [projects, setProjects] = useState<Record<string, ProjectMeta>>({})
+  const [showSaveModal, setShowSaveModal] = useState(false)
+  const [allNodeCount, setAllNodeCount] = useState<{ total: number; unsaved: number }>({ total: 0, unsaved: 0 })
   const reactFlow = useReactFlow()
   const highlightTimerRef = useRef<ReturnType<typeof setTimeout>>(null)
 
   const fetchGraph = useCallback(
     async (meta?: ProtoMeta) => {
-      const [graphRes, metaRes] = await Promise.all([
-        fetch('/api/graph'),
+      const graphUrl = currentProject
+        ? `/api/graph?project=${encodeURIComponent(currentProject)}`
+        : '/api/graph'
+
+      const [graphRes, metaRes, projectsRes, allGraphRes] = await Promise.all([
+        fetch(graphUrl),
         meta ? null : fetch('/api/prototypes'),
+        fetch('/api/projects'),
+        // Fetch unfiltered graph for unsaved count when filtered
+        currentProject ? fetch('/api/graph') : null,
       ])
 
       const data = (await graphRes.json()) as Record<string, PrototypeNodeType>
       const currentMeta: ProtoMeta = meta ??
         ((metaRes ? await metaRes.json() : {}) as ProtoMeta)
+      const projectsData = (await projectsRes.json()) as Record<string, ProjectMeta>
 
       if (!meta) {
         setProtoMeta(currentMeta)
+      }
+      setProjects(projectsData)
+
+      // Compute unsaved count from full graph
+      if (allGraphRes) {
+        const allData = (await allGraphRes.json()) as Record<string, PrototypeNodeType>
+        const allNodes = Object.values(allData)
+        setAllNodeCount({
+          total: allNodes.length,
+          unsaved: allNodes.filter(n => n.project === null).length,
+        })
+      } else {
+        // We're in "all" view, compute from current data
+        const allNodes = Object.values(data)
+        setAllNodeCount({
+          total: allNodes.length,
+          unsaved: allNodes.filter(n => n.project === null).length,
+        })
       }
 
       const nodeList = Object.values(data)
@@ -85,13 +117,16 @@ function GraphEditor() {
       const metaMap = new Map(
         Object.entries(currentMeta).map(([id, m]) => [id, m])
       )
-      const layout = layoutGraph(nodeList, metaMap)
+      const projectColorMap = new Map(
+        Object.values(projectsData).map(p => [p.slug, p.color])
+      )
+      const layout = layoutGraph(nodeList, metaMap, projectColorMap)
       setNodes(layout.nodes)
       setEdges(layout.edges)
       setLoading(false)
       return nodeList
     },
-    [setNodes, setEdges]
+    [setNodes, setEdges, currentProject]
   )
 
   useEffect(() => {
@@ -136,7 +171,13 @@ function GraphEditor() {
 
       switch (modalType) {
         case 'generate':
-          body = { type: 'generate', question: data.value.trim() }
+          body = {
+            type: 'generate',
+            question: data.value.trim(),
+            project: currentProject && currentProject !== '__unsaved__'
+              ? currentProject
+              : null,
+          }
           break
         case 'decompose': {
           const childQuestions = data.value
@@ -187,7 +228,10 @@ function GraphEditor() {
       const metaMap = new Map(
         Object.entries(protoMeta).map(([id, m]) => [id, m])
       )
-      const layout = layoutGraph(nodeList, metaMap)
+      const projectColorMap = new Map(
+        Object.values(projects).map(p => [p.slug, p.color])
+      )
+      const layout = layoutGraph(nodeList, metaMap, projectColorMap)
 
       setNodes(
         layout.nodes.map(n => ({
@@ -216,7 +260,7 @@ function GraphEditor() {
         setNodes(prev => prev.map(n => ({ ...n, className: undefined })))
       }, 1500)
     },
-    [modalType, selectedIds, protoMeta, setNodes, setEdges, reactFlow]
+    [modalType, selectedIds, protoMeta, setNodes, setEdges, reactFlow, currentProject, projects]
   )
 
   const handleApprove = useCallback(
@@ -269,6 +313,34 @@ function GraphEditor() {
     [fetchGraph]
   )
 
+  const handleSaveProject = useCallback(
+    async (name: string, description: string) => {
+      const res = await fetch('/api/projects/save-current', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, description }),
+      })
+      if (!res.ok) return
+      const { project } = (await res.json()) as { project: ProjectMeta }
+      setShowSaveModal(false)
+      setCurrentProject(project.slug)
+    },
+    []
+  )
+
+  const handleDeleteProject = useCallback(
+    async (slug: string) => {
+      if (!window.confirm(`Delete project "${projects[slug]?.name}"? Nodes will become unsaved.`)) return
+      await fetch(`/api/projects/${slug}`, { method: 'DELETE' })
+      if (currentProject === slug) {
+        setCurrentProject(null)
+      } else {
+        await fetchGraph()
+      }
+    },
+    [currentProject, projects, fetchGraph]
+  )
+
   const selectedNodeData = graphNodes.filter(n => selectedIds.has(n.id))
   const sheetOpen = selectedNodeData.length > 0
   const prevSheetOpen = useRef(false)
@@ -313,6 +385,16 @@ function GraphEditor() {
           <Background gap={16} size={1} />
           <Controls />
           <MiniMap nodeStrokeWidth={3} pannable zoomable />
+          <Panel position="top-left">
+            <ProjectSwitcher
+              projects={projects}
+              currentProject={currentProject}
+              unsavedCount={allNodeCount.unsaved}
+              onSwitch={setCurrentProject}
+              onSave={() => setShowSaveModal(true)}
+              onDelete={handleDeleteProject}
+            />
+          </Panel>
           <Panel position="bottom-center">
             <div className="flex flex-col items-center mb-2">
               <ApprovalQueue
@@ -373,7 +455,7 @@ function GraphEditor() {
 
                   {node.result?.session_id && (
                     <code className="block text-[9px] text-gray-500 bg-gray-100 rounded px-2 py-1 mb-2 font-mono select-all whitespace-pre-line">
-                      {`cd ~/Desktop/cool-projects/ralph-kit-test/THOU-DEMO/prototypes/${node.id}\nclaude --resume ${node.result.session_id} --dangerously-skip-permissions`}
+                      {`cd ~/.thou/prototypes/${node.id}\nclaude --resume ${node.result.session_id} --dangerously-skip-permissions`}
                     </code>
                   )}
 
@@ -444,9 +526,17 @@ function GraphEditor() {
           selectedNodes={selectedNodeData.map(n => ({
             id: n.id,
             question: n.question,
+            project: n.project,
           }))}
           onSubmit={handleModalSubmit}
           onClose={() => setModalType(null)}
+        />
+      )}
+
+      {showSaveModal && (
+        <SaveProjectModal
+          onSave={handleSaveProject}
+          onClose={() => setShowSaveModal(false)}
         />
       )}
     </div>

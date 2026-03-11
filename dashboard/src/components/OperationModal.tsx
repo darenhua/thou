@@ -3,7 +3,7 @@ import type { OperationType } from './OperationToolbar'
 
 interface OperationModalProps {
   type: OperationType
-  selectedNodes: { id: string; question: string }[]
+  selectedNodes: { id: string; question: string; project?: string | null }[]
   onSubmit: (data: Record<string, string>) => void
   onClose: () => void
 }
@@ -87,6 +87,12 @@ export default function OperationModal({
                 <span className="font-medium text-gray-700">Child 2:</span>{' '}
                 {selectedNodes[1]?.question}
               </div>
+              {selectedNodes.length === 2 &&
+                selectedNodes[0].project !== selectedNodes[1].project && (
+                  <div className="mt-2 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    These nodes belong to different projects. The joined node will be created as unsaved.
+                  </div>
+                )}
             </div>
           )}
 

@@ -33,15 +33,22 @@ export default function PrototypeNode({
   const isApproved = data.approved_at !== null
   const isCompleted = data.completed_at !== null
 
-  const borderColor = selected
+  const borderClass = selected
     ? 'border-blue-500 ring-2 ring-blue-200'
     : isApproved
       ? 'border-green-400'
       : 'border-gray-200'
 
+  // In "all projects" view, override border with project color (unless selected or approved)
+  const dynamicBorderStyle =
+    !selected && !isApproved && data.projectColor
+      ? { borderColor: data.projectColor }
+      : undefined
+
   return (
     <div
-      className={`rounded-lg bg-white shadow-md border-2 w-[300px] overflow-hidden ${borderColor}`}
+      className={`rounded-lg bg-white shadow-md border-2 w-[300px] overflow-hidden ${borderClass}`}
+      style={dynamicBorderStyle}
     >
       <Handle type="target" position={Position.Top} className="!bg-gray-400" />
 

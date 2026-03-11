@@ -1,20 +1,21 @@
 import { access, mkdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { Command } from 'commander'
+import { PROJECTS_DIR, PROTOTYPES_DIR, THOU_HOME, TREE_DIR } from '../paths'
 import { ROOT } from '../root'
 
 export const initCommand = new Command('init')
   .description('Initialize project directories and install dashboard deps')
   .action(async () => {
-    const prototypesDir = resolve(ROOT, 'prototypes')
-    const treeDir = resolve(ROOT, 'tree')
     const progressFile = resolve(ROOT, 'ralph/progress.txt')
     const dashboardDir = resolve(ROOT, 'dashboard')
 
     // Create directories
-    await mkdir(prototypesDir, { recursive: true })
-    await mkdir(treeDir, { recursive: true })
-    console.log('Created prototypes/ and tree/ directories')
+    await mkdir(THOU_HOME, { recursive: true })
+    await mkdir(PROTOTYPES_DIR, { recursive: true })
+    await mkdir(TREE_DIR, { recursive: true })
+    await mkdir(PROJECTS_DIR, { recursive: true })
+    console.log(`Created ${THOU_HOME}/{prototypes,tree,projects}/ directories`)
 
     // Touch ralph/progress.txt
     const progressExists = await access(progressFile)
@@ -40,7 +41,8 @@ export const initCommand = new Command('init')
     }
 
     console.log('\nthou-demo initialized successfully!')
-    console.log('  prototypes/  — prototype apps go here')
-    console.log('  tree/        — graph state (JSON files)')
-    console.log('  dashboard/   — graph visualization UI')
+    console.log('  ~/.thou/prototypes/  — prototype apps go here')
+    console.log('  ~/.thou/tree/        — graph state (JSON files)')
+    console.log('  ~/.thou/projects/    — project metadata (JSON files)')
+    console.log('  dashboard/           — graph visualization UI')
   })

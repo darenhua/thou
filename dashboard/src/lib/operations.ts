@@ -1,7 +1,7 @@
 import type { NodeType, OperationResult, PrototypeNode } from './types'
 
 export type OperationPayload =
-  | { type: 'generate'; question: string }
+  | { type: 'generate'; question: string; project?: string | null }
   | {
       type: 'decompose'
       parentNodeId: string
@@ -35,6 +35,7 @@ function createNode(
     childIds: [],
     parentIds: [],
     sourceNodeId: null,
+    project: null,
     prompt: null,
     bead: null,
     result: null,
@@ -61,6 +62,7 @@ export function applyOperation(
       const node = createNode({
         question: op.question,
         nodeType: 'generate',
+        project: op.project ?? null,
       })
       updated[node.id] = node
       createdNodeIds.push(node.id)
@@ -93,6 +95,7 @@ export function applyOperation(
         const child = createNode({
           question: q,
           nodeType: 'decompose',
+          project: parent.project ?? null,
         })
         updatedParent.childIds.push(child.id)
         updated[child.id] = child
@@ -114,6 +117,7 @@ export function applyOperation(
         nodeType: 'variant',
         sourceNodeId: op.sourceNodeId,
         childIds: [op.sourceNodeId],
+        project: source.project ?? null,
       })
       updated[node.id] = node
       createdNodeIds.push(node.id)
@@ -130,10 +134,17 @@ export function applyOperation(
         throw new Error(`Child node "${op.child2Id}" does not exist`)
       }
 
+      // If both children share the same project, inherit it; otherwise null
+      const joinProject =
+        child1.project && child1.project === child2.project
+          ? child1.project
+          : null
+
       const parent = createNode({
         question: op.parentQuestion,
         nodeType: 'join',
         childIds: [op.child1Id, op.child2Id],
+        project: joinProject,
       })
 
       updated[parent.id] = parent

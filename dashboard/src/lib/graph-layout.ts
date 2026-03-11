@@ -17,6 +17,8 @@ export interface PrototypeNodeData {
   description: string | null
   port: number | null
   isPrototype: boolean
+  projectSlug: string | null
+  projectColor: string | null
   [key: string]: unknown
 }
 
@@ -25,7 +27,11 @@ export const NODE_HEIGHT = 280
 
 export function prototypeToFlowNode(
   node: PrototypeNode,
-  extra?: { description?: string | null; port?: number | null }
+  extra?: {
+    description?: string | null
+    port?: number | null
+    projectColor?: string | null
+  }
 ): ReactFlowNode<PrototypeNodeData> {
   const isProto = node.id.startsWith('thou-demo-')
   return {
@@ -40,6 +46,8 @@ export function prototypeToFlowNode(
       description: extra?.description ?? null,
       port: extra?.port ?? null,
       isPrototype: isProto,
+      projectSlug: node.project ?? null,
+      projectColor: extra?.projectColor ?? null,
     },
     type: 'prototypeNode',
     position: { x: 0, y: 0 },
@@ -48,7 +56,8 @@ export function prototypeToFlowNode(
 
 export function layoutGraph(
   nodes: PrototypeNode[],
-  protoMeta?: Map<string, { description: string; port: number }>
+  protoMeta?: Map<string, { description: string; port: number }>,
+  projectColors?: Map<string, string>
 ): {
   nodes: ReactFlowNode<PrototypeNodeData>[]
   edges: ReactFlowEdge[]
@@ -105,9 +114,13 @@ export function layoutGraph(
   const flowNodes: ReactFlowNode<PrototypeNodeData>[] = nodes.map(node => {
     const dagreNode = g.node(node.id)
     const meta = protoMeta?.get(node.id)
+    const projectColor = node.project
+      ? projectColors?.get(node.project) ?? null
+      : null
     const flowNode = prototypeToFlowNode(node, {
       description: meta?.description,
       port: meta?.port,
+      projectColor,
     })
     flowNode.position = {
       x: dagreNode.x - NODE_WIDTH / 2,
@@ -116,5 +129,16 @@ export function layoutGraph(
     return flowNode
   })
 
-  return { nodes: flowNodes, edges }
+  // Tint edges to match project color when both endpoints share the same project
+  const nodeProjectMap = new Map(nodes.map(n => [n.id, n.project]))
+  const coloredEdges = edges.map(edge => {
+    const srcProject = nodeProjectMap.get(edge.source)
+    const tgtProject = nodeProjectMap.get(edge.target)
+    if (srcProject && srcProject === tgtProject && projectColors?.has(srcProject)) {
+      return { ...edge, style: { stroke: projectColors.get(srcProject) } }
+    }
+    return edge
+  })
+
+  return { nodes: flowNodes, edges: coloredEdges }
 }

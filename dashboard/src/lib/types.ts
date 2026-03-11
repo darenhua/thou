@@ -7,6 +7,7 @@ export interface TreeFile {
   nodeType: NodeType
   childIds: string[]
   sourceNodeId: string | null
+  project: string | null
   timestamps: {
     created_at: string
     updated_at: string
@@ -26,6 +27,14 @@ export interface TreeFile {
     duration_ms: number | null
     session_id: string | null
   } | null
+}
+
+export interface ProjectMeta {
+  slug: string
+  name: string
+  color: string
+  description: string
+  createdAt: string
 }
 
 export interface PrototypeNode extends TreeFile {

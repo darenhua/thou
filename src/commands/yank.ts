@@ -1,8 +1,8 @@
 import { access, mkdir, writeFile } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 import { Command } from 'commander'
 import type { TreeFile } from '../../dashboard/src/lib/types'
-import { ROOT } from '../root'
+import { PROTOTYPES_DIR, TREE_DIR } from '../paths'
 
 function generateId(): string {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
@@ -23,8 +23,7 @@ export const yankCommand = new Command('yank')
       const id = opts.id ?? generateId()
       const question = opts.question ?? id
       const src = resolve(sourcePath)
-      const dest = resolve(ROOT, 'prototypes', id)
-      const treeDir = resolve(ROOT, 'tree')
+      const dest = join(PROTOTYPES_DIR, id)
 
       // Verify source exists
       const srcExists = await access(src)
@@ -69,7 +68,7 @@ export const yankCommand = new Command('yank')
       }
 
       // Write tree file
-      await mkdir(treeDir, { recursive: true })
+      await mkdir(TREE_DIR, { recursive: true })
       const now = new Date().toISOString()
       const treeFile: TreeFile = {
         id,
@@ -88,13 +87,13 @@ export const yankCommand = new Command('yank')
         result: null,
       }
       await writeFile(
-        resolve(treeDir, `${id}.json`),
+        join(TREE_DIR, `${id}.json`),
         `${JSON.stringify(treeFile, null, 2)}\n`,
         'utf-8'
       )
 
       console.log(`\nYanked as ${id}`)
-      console.log(`  Prototype: prototypes/${id}/`)
-      console.log(`  Tree file: tree/${id}.json`)
+      console.log(`  Prototype: ~/.thou/prototypes/${id}/`)
+      console.log(`  Tree file: ~/.thou/tree/${id}.json`)
     }
   )

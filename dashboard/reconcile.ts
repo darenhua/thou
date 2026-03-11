@@ -21,9 +21,8 @@ interface BeadIssue {
   dependencies: { depends_on_id: string }[]
 }
 
+import { PROTOTYPES_DIR, TREE_DIR } from '../src/paths'
 const ROOT = resolve(import.meta.dir, '..')
-const PROTOTYPES_DIR = resolve(ROOT, 'prototypes')
-const TREE_DIR = resolve(ROOT, 'tree')
 const dryRun = process.argv.includes('--dry-run')
 const clean = process.argv.includes('--clean')
 

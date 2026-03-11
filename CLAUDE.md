@@ -14,7 +14,7 @@ bunx <cmd>            # Run a package command
 ## CLI Commands
 
 ```bash
-bun run index.ts init          # Initialize directories (prototypes/, tree/) + install dashboard deps
+bun run index.ts init          # Initialize ~/.thou/ directories + install dashboard deps
 bun run index.ts ralph         # Run the ralph prototype loop
 bun run index.ts graph         # Start the dashboard (API on :3100, Vite on :3105)
 bun run index.ts yank [path]   # Copy external project into prototypes/
@@ -23,16 +23,20 @@ bun run index.ts yank [path]   # Copy external project into prototypes/
 ## Project Structure
 
 ```
-THOU-DEMO/
+THOU-DEMO/                    # Source code (checked into git)
 ├── index.ts              # Commander CLI entry point
 ├── src/commands/          # CLI command implementations
+├── src/paths.ts           # Data directory constants (~/.thou/*)
 ├── ralph/                 # Prototype factory loop (bash)
 ├── dashboard/             # Vite + Bun.serve() graph visualization
 │   ├── start.ts           # Orchestrator (proto servers + API + Vite)
 │   ├── src/               # React frontend (xyflow, dagre, tailwind)
 │   └── reconcile.ts       # Bead → tree file reconciliation
-├── prototypes/            # Generated prototype apps (created at runtime)
-└── tree/                  # Graph state as JSON files (created at runtime)
+
+~/.thou/                      # Runtime data (NOT in repo)
+├── prototypes/            # Generated prototype apps
+├── tree/                  # Graph state as JSON files
+└── projects/              # Project metadata as JSON files
 ```
 
 ## Issue Tracking (beads)
@@ -56,5 +60,5 @@ bd create "<issue name>" --description "<long description>"  # Create an issue
 ## Key Conventions
 
 - Prototype IDs: `thou-demo-<3chars>` (e.g., `thou-demo-a1b`)
-- Tree files: `tree/<id>.json` (one per graph node)
+- Tree files: `~/.thou/tree/<id>.json` (one per graph node)
 - Prototype prefix: `thou-demo-` (not `ralph-kit-test-`)
